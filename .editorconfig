@@ -1,0 +1,18 @@
+# editorconfig.org
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{kt,kts,swift}]
+indent_size = 4
+
+# Copied from the native SDK repositories by scripts/sync-native.sh.
+[{ios/ResponslySDK/**,android/src/main/java/com/responsly/sdk/**}]
+trim_trailing_whitespace = unset
+insert_final_newline = unset

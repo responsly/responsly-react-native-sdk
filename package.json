@@ -1,0 +1,141 @@
+{
+  "name": "@responsly/react-native-sdk",
+  "version": "0.6.0",
+  "description": "Show Responsly surveys inside your React Native app.",
+  "main": "./lib/module/index.js",
+  "types": "./lib/typescript/src/index.d.ts",
+  "exports": {
+    ".": {
+      "responsly-react-native-sdk-source": "./src/index.ts",
+      "types": "./lib/typescript/src/index.d.ts",
+      "default": "./lib/module/index.js"
+    },
+    "./app.plugin": "./app.plugin.js",
+    "./app.plugin.js": "./app.plugin.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "android",
+    "ios",
+    "*.podspec",
+    "app.plugin.js",
+    "native-sdk.json",
+    "!ios/build",
+    "!android/build",
+    "!android/gradle",
+    "!android/gradlew",
+    "!android/gradlew.bat",
+    "!android/local.properties",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "prepare": "bob build",
+    "typecheck": "tsc",
+    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "test": "jest",
+    "sync-native": "bash scripts/sync-native.sh",
+    "clean": "del-cli lib android/build example/android/build example/android/app/build example/ios/build"
+  },
+  "keywords": [
+    "react-native",
+    "ios",
+    "android",
+    "expo",
+    "responsly",
+    "survey",
+    "in-app-survey",
+    "feedback",
+    "nps"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/responsly/responsly-react-native-sdk.git"
+  },
+  "author": "Responsly (https://responsly.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/responsly/responsly-react-native-sdk/issues"
+  },
+  "homepage": "https://developers.responsly.com/mobile-sdk/",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": ">=0.75.0"
+  },
+  "devDependencies": {
+    "@eslint/compat": "^2.1.1",
+    "@eslint/eslintrc": "^3.3.7",
+    "@eslint/js": "^9.39.5",
+    "@react-native/babel-preset": "0.88.1",
+    "@react-native/eslint-config": "0.88.1",
+    "@react-native/jest-preset": "0.88.1",
+    "@types/jest": "^29.5.13",
+    "@types/react": "^19.2.0",
+    "@types/react-test-renderer": "^19.1.0",
+    "del-cli": "^8.0.1",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-ft-flow": "^3.0.11",
+    "eslint-plugin-prettier": "^5.5.7",
+    "jest": "^29.7.0",
+    "prettier": "^3.9.10",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-builder-bob": "^0.44.1",
+    "react-test-renderer": "19.3.0",
+    "typescript": "^6.0.3"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      [
+        "module",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "codegenConfig": {
+    "name": "ResponslySdkSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.responsly.reactnative"
+    },
+    "ios": {
+      "modulesProvider": {
+        "ResponslySdk": "ResponslySdk"
+      }
+    }
+  },
+  "prettier": {
+    "quoteProps": "consistent",
+    "singleQuote": true,
+    "tabWidth": 2,
+    "trailingComma": "es5",
+    "useTabs": false
+  },
+  "jest": {
+    "preset": "@react-native/jest-preset",
+    "modulePathIgnorePatterns": [
+      "<rootDir>/example/",
+      "<rootDir>/lib/"
+    ]
+  }
+}

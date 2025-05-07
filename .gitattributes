@@ -1,0 +1,6 @@
+*.pbxproj -text
+*.bat text eol=crlf
+
+# Copied from the native SDK repositories by scripts/sync-native.sh.
+ios/ResponslySDK/** linguist-vendored
+android/src/main/java/com/responsly/sdk/** linguist-vendored
