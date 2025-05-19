@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.6.2] - 2025-05-19
+
+- Encode JavaScript traits and native method arguments.
+
 ## [0.6.1] - 2025-05-13
 
 - Define the public TypeScript SDK contract.
