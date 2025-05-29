@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.6.4] - 2025-05-29
+
+- Expose SDK methods listeners and asynchronous display guards.
+
 ## [0.6.3] - 2025-05-22
 
 - Translate native survey events into typed callbacks.
