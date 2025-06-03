@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.6.5] - 2025-06-03
+
+- Track React Navigation screens and screen hooks.
+
 ## [0.6.4] - 2025-05-29
 
 - Expose SDK methods listeners and asynchronous display guards.
