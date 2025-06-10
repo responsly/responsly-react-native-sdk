@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.6.6] - 2025-06-10
+
+- Define TurboModule and legacy architecture specifications.
+
 ## [0.6.5] - 2025-06-03
 
 - Track React Navigation screens and screen hooks.
