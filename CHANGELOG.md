@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.6.7] - 2025-06-19
+
+- Configure the Android library and manifest.
+
 ## [0.6.6] - 2025-06-10
 
 - Define TurboModule and legacy architecture specifications.

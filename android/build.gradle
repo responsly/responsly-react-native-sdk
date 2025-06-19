@@ -1,0 +1,72 @@
+import groovy.json.JsonSlurper
+
+// The versions the Responsly Android SDK pins, recorded by scripts/sync-native.sh.
+def nativeSdk = new JsonSlurper().parse(file("../native-sdk.json"))
+def nativeDependencies = nativeSdk.android.dependencies
+
+ext.ResponslySdk = [
+  minSdkVersion: 23,
+  compileSdkVersion: 36
+]
+
+ext.getExtOrDefault = { prop ->
+  if (rootProject.ext.has(prop)) {
+    return rootProject.ext.get(prop)
+  }
+
+  return ResponslySdk[prop]
+}
+
+// The old architecture is used only when the app turns the new one off explicitly
+// (possible up to React Native 0.81).
+def isNewArchitectureEnabled() {
+  return !(rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "false")
+}
+
+apply plugin: "com.android.library"
+
+if (project.extensions.findByName("kotlin") == null) {
+  apply plugin: "kotlin-android"
+}
+
+if (isNewArchitectureEnabled()) {
+  // Generates the TurboModule spec (NativeResponslySdkSpec) from src/NativeResponslySdk.ts.
+  apply plugin: "com.facebook.react"
+}
+
+android {
+  namespace "com.responsly.reactnative"
+
+  compileSdkVersion getExtOrDefault("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion getExtOrDefault("minSdkVersion")
+    buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+    // Shrinker rules of the Responsly Android SDK, copied by scripts/sync-native.sh.
+    consumerProguardFiles "consumer-rules.pro"
+  }
+
+  buildFeatures {
+    buildConfig true
+  }
+
+  sourceSets {
+    main {
+      // src/main/java holds the bridge (com.responsly.reactnative) and the sources of the
+      // Responsly Android SDK (com.responsly.sdk, copied by scripts/sync-native.sh).
+      if (isNewArchitectureEnabled()) {
+        java.srcDirs += ["src/newarch/java"]
+      } else {
+        java.srcDirs += ["src/oldarch/java"]
+      }
+    }
+  }
+}
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+
+  // Dependencies of the Responsly Android SDK, at the versions it is built and tested with.
+  implementation "androidx.webkit:webkit:${nativeDependencies['androidx.webkit:webkit']}"
+  implementation "androidx.annotation:annotation:${nativeDependencies['androidx.annotation:annotation']}"
+}

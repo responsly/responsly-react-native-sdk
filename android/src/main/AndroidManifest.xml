@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copied from responsly-android-sdk by scripts/sync-native.sh. Do not edit here. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The only permission the SDK uses. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <!--
+            Lets the SDK know which activity is in front, so surveys can appear above it without
+            the app passing an activity. No data, no queries; see StartupProvider.kt.
+        -->
+        <provider
+            android:name="com.responsly.sdk.internal.platform.StartupProvider"
+            android:authorities="${applicationId}.responsly-sdk-startup"
+            android:exported="false" />
+
+        <!-- Opens the system document picker for file inputs of a survey; see FileChooser.kt. -->
+        <activity
+            android:name="com.responsly.sdk.internal.ui.FileChooserActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+
+</manifest>
