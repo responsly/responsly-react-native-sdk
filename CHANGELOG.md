@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.7.0] - 2025-06-28
+
+- Package the iOS bridge and privacy manifest.
+
 ## [0.6.7] - 2025-06-19
 
 - Configure the Android library and manifest.
