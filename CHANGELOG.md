@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.7.1] - 2025-07-05
+
+- Import native iOS public options values and events.
+
 ## [0.7.0] - 2025-06-28
 
 - Package the iOS bridge and privacy manifest.
