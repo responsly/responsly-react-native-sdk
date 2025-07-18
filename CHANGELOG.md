@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.7.3] - 2025-07-18
+
+- Persist native iOS identity traits and survey state.
+
 ## [0.7.2] - 2025-07-08
 
 - Import native iOS state values and logging.
