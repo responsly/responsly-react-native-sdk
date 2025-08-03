@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.7.5] - 2025-08-03
+
+- Evaluate native iOS survey targeting.
+
 ## [0.7.4] - 2025-07-26
 
 - Decode iOS configuration and evaluate audience conditions.
