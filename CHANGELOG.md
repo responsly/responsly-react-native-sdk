@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.7.6] - 2025-08-09
+
+- Import iOS API transport and telemetry queue.
+
 ## [0.7.5] - 2025-08-03
 
 - Evaluate native iOS survey targeting.
