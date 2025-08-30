@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.8.1] - 2025-08-30
+
+- Integrate the native iOS core and public facade.
+
 ## [0.8.0] - 2025-08-22
 
 - Present surveys through UIKit and WebKit.
