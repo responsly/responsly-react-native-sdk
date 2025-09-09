@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.8.2] - 2025-09-09
+
+- Import native Android public API and events.
+
 ## [0.8.1] - 2025-08-30
 
 - Integrate the native iOS core and public facade.
