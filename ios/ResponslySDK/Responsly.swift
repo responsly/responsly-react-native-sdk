@@ -15,7 +15,7 @@ public final class Responsly: @unchecked Sendable {
     public static let shared = Responsly()
 
     /// The version of this SDK.
-    public static let sdkVersion: String = "0.8.3"
+    public static let sdkVersion: String = "0.8.4"
 
     private let core: ResponslyCore
     private let lifecycleObserver: AnyObject?
