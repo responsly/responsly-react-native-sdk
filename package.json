@@ -1,6 +1,6 @@
 {
   "name": "@responsly/react-native-sdk",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "Show Responsly surveys inside your React Native app.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
