@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.8.7] - 2025-10-21
+
+- Integrate native Android core listeners and presentation contracts.
+
 ## [0.8.6] - 2025-10-12
 
 - Import Android API transport and telemetry queue.
