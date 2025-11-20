@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.9.3] - 2025-11-20
+
+- Synchronize native sources and add Expo configuration.
+
 ## [0.9.2] - 2025-11-15
 
 - Connect React Native calls and callbacks to native SDKs.
