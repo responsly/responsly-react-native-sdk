@@ -3,13 +3,13 @@
     "repository": "https://github.com/responsly/responsly-ios-sdk",
     "commit": "c4f891051c961389cbf7b5447e00bc8dfeceb068",
     "dirty": false,
-    "version": "0.9.3"
+    "version": "0.9.4"
   },
   "android": {
     "repository": "https://github.com/responsly/responsly-android-sdk",
     "commit": "b914e80649e155e35ac59416db605f7c50a87be7",
     "dirty": false,
-    "version": "0.9.3",
+    "version": "0.9.4",
     "dependencies": {
       "androidx.webkit:webkit": "1.15.0",
       "androidx.annotation:annotation": "1.9.1"

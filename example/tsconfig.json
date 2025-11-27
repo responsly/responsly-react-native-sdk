@@ -1,0 +1,10 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "paths": {
+      "@responsly/react-native-sdk": ["../src/index"]
+    }
+  },
+  "include": ["src", "index.js"],
+  "exclude": ["**/node_modules", "**/Pods"]
+}
