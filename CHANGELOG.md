@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [0.9.5] - 2025-12-07
+
+- Verify JavaScript calls events values navigation and plugin behavior.
+
 ## [0.9.4] - 2025-11-27
 
 - Add the React Native example application.
