@@ -138,9 +138,6 @@ internal class ResponslyCore(
     private var telemetry: TelemetryQueue? = null
     private var sdkKey: String? = null
 
-    /** The API host in use, without a trailing slash. */
-    private var apiHost: String? = null
-
     private var config: SdkConfig? = null
 
     /** The configuration is available and the calls queued before it have been evaluated. */
@@ -248,8 +245,7 @@ internal class ResponslyCore(
                 if (active.phase == Phase.VISIBLE) {
                     closeVisible(active, animated = true)
                 } else {
-                    // Never shown: cancelled without a state change, telemetry or a callback.
-                    cancelBeforeVisible(active, "tracking disabled")
+                    endNotShown(active, NotShownReason.DISABLED)
                 }
             }
             pendingCalls.filterIsInstance<PendingCall.Show>().forEach { notShown(it.surveyId, NotShownReason.DISABLED) }
@@ -314,14 +310,9 @@ internal class ResponslyCore(
             logger.error("initialize: the SDK key is empty; the call is ignored")
             return
         }
-        val host = options.apiHost.trim().trimEnd('/')
         var store = this.store
         if (store != null && sdkKey == key) {
-            if (apiHost == host) {
-                logger.debug { "initialize: already initialised with this key and API host" }
-            } else {
-                switchApiHost(store, key, host)
-            }
+            logger.debug { "initialize: already initialised with this key" }
             return
         }
         if (store != null) {
@@ -343,17 +334,11 @@ internal class ResponslyCore(
         }
         store.bindSdkKey(key)
         sdkKey = key
-        apiHost = host
-        val api = platform.createApi(host, key)
+        val api = platform.createApi(options.apiHost, key)
         this.api = api
         val telemetry = TelemetryQueue(store, api, scheduler, logger)
         this.telemetry = telemetry
 
-        // A cached configuration is only ever used with the host it was downloaded from.
-        if (store.configBody != null && store.configHost != host) {
-            logger.debug { "config: the cached copy is from another API host; dropped" }
-            store.clearConfig()
-        }
         config = store.configBody?.let(ConfigParser::parse)
         if (config == null && store.configBody != null) store.clearConfig()
         logger.info {
@@ -369,37 +354,6 @@ internal class ResponslyCore(
 
         if (config != null) onConfigAvailable()
         refreshConfigIfNeeded("initialize")
-        telemetry.start()
-    }
-
-    /**
-     * `initialize` again with the same key and another host: everything the user did stays, but the
-     * configuration has to come from the new host.
-     */
-    private fun switchApiHost(store: StateStore, key: String, host: String) {
-        val platform = platform ?: return
-        logger.info { "initialize: the API host changed; downloading the configuration again" }
-        // A survey of the old configuration that is not on screen yet is not shown any more.
-        session?.let { active ->
-            if (active.phase != Phase.VISIBLE) cancelBeforeVisible(active, "API host changed")
-        }
-        store.clearConfig()
-        config = null
-        configReady = false
-        // An answer still on its way from the old host must not be taken for the new one's.
-        fetchInFlight = false
-        generation++
-        keyInvalid = false
-        appLaunchEvaluated = false
-
-        apiHost = host
-        val api = platform.createApi(host, key)
-        this.api = api
-        telemetry?.close()
-        val telemetry = TelemetryQueue(store, api, scheduler, logger)
-        this.telemetry = telemetry
-
-        refreshConfigIfNeeded("API host changed")
         telemetry.start()
     }
 
@@ -471,7 +425,7 @@ internal class ResponslyCore(
                 if (parsed == null) {
                     logger.error("config: the response is not a JSON object; keeping the cached copy")
                 } else {
-                    store.saveConfig(response.body, response.etag, clock.now(), apiHost.orEmpty())
+                    store.saveConfig(response.body, response.etag, clock.now())
                     config = parsed
                     logger.debug { "config: fetched, ${parsed.surveys.size} survey(s), ttl ${parsed.ttlMillis / 1000} s" }
                 }

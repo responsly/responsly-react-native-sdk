@@ -42,10 +42,6 @@ internal class StateStore(
     var configFetchedAt: Long? = null
         private set
 
-    /** The API host the cached configuration was downloaded from. */
-    var configHost: String? = null
-        private set
-
     val telemetry: MutableList<TelemetryEvent> = ArrayList()
 
     fun load() {
@@ -89,7 +85,6 @@ internal class StateStore(
         configBody = storage.getString(KEY_CONFIG)
         configEtag = storage.getString(KEY_CONFIG_ETAG)
         configFetchedAt = storage.getString(KEY_CONFIG_FETCHED_AT)?.toLongOrNull()
-        configHost = storage.getString(KEY_CONFIG_HOST)
 
         telemetry.clear()
         storage.getString(KEY_TELEMETRY)?.let { raw ->
@@ -161,15 +156,13 @@ internal class StateStore(
         saveSurveys()
     }
 
-    fun saveConfig(body: String, etag: String?, fetchedAt: Long, host: String) {
+    fun saveConfig(body: String, etag: String?, fetchedAt: Long) {
         configBody = body
         configEtag = etag
         configFetchedAt = fetchedAt
-        configHost = host
         storage.putString(KEY_CONFIG, body)
         storage.putString(KEY_CONFIG_ETAG, etag)
         storage.putString(KEY_CONFIG_FETCHED_AT, fetchedAt.toString())
-        storage.putString(KEY_CONFIG_HOST, host)
     }
 
     /** `304 Not Modified`: the cached copy is fresh again. */
@@ -182,11 +175,9 @@ internal class StateStore(
         configBody = null
         configEtag = null
         configFetchedAt = null
-        configHost = null
         storage.putString(KEY_CONFIG, null)
         storage.putString(KEY_CONFIG_ETAG, null)
         storage.putString(KEY_CONFIG_FETCHED_AT, null)
-        storage.putString(KEY_CONFIG_HOST, null)
     }
 
     fun saveTelemetry() {
@@ -252,7 +243,6 @@ internal class StateStore(
         const val KEY_CONFIG = "config"
         const val KEY_CONFIG_ETAG = "config_etag"
         const val KEY_CONFIG_FETCHED_AT = "config_fetched_at"
-        const val KEY_CONFIG_HOST = "config_api_host"
         const val KEY_TELEMETRY = "telemetry_queue"
 
         private val RESET_KEYS = listOf(

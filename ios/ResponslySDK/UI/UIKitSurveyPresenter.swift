@@ -93,7 +93,7 @@ final class UIKitSurveyPresenter: SurveyPresenting, @unchecked Sendable {
         window.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.alert.rawValue - 1)
         window.backgroundColor = .clear
         // The page loads while the container is invisible: the window is on screen so that the
-        // page runs normally, but touches fall through to the app until the survey is revealed.
+        // page runs normally, but touches fall through to the app until `ready`.
         window.isUserInteractionEnabled = false
         window.rootViewController = controller
         window.isHidden = false

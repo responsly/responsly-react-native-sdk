@@ -53,10 +53,10 @@ final class ResponslyCore: @unchecked Sendable {
         enum Phase {
             /// Waiting for `delay_seconds`.
             case delay
+            /// Waiting for the display guard.
+            case displayGuard
             /// The WebView is loading, hidden.
             case loading
-            /// The page is ready, still hidden; waiting for the display guard.
-            case displayGuard
             case visible
         }
 
@@ -70,11 +70,6 @@ final class ResponslyCore: @unchecked Sendable {
         init(survey: SurveyConfig, source: Source) {
             self.survey = survey
             self.source = source
-        }
-
-        /// The UI layer holds a page for this session that is not on screen yet.
-        var hasHiddenPage: Bool {
-            phase == .loading || phase == .displayGuard
         }
 
         /// Selected by targeting rather than requested with `showSurvey`.
@@ -726,7 +721,7 @@ final class ResponslyCore: @unchecked Sendable {
         self.session = session
         let delay = session.isAuto ? session.survey.delaySeconds : 0
         guard delay > 0 else {
-            load(session)
+            askDisplayGuard(session)
             return
         }
         session.phase = .delay
@@ -763,18 +758,13 @@ final class ResponslyCore: @unchecked Sendable {
             fail(session, .screenChanged)
             return
         }
-        load(session)
+        askDisplayGuard(session)
     }
 
-    /// The page reported `ready`. Unless the survey was forced, the app's display guard has the
-    /// last say right before the survey becomes visible.
-    private func pageBecameReady(_ session: SurveySession) {
-        // The load timeout ends here: time spent waiting for the guard is not loading time.
-        session.timer?.cancel()
-        session.timer = nil
+    private func askDisplayGuard(_ session: SurveySession) {
         let forced = session.showOptions?.force ?? false
         guard !forced, let displayGuard = displayGuard else {
-            makeVisible(session)
+            load(session)
             return
         }
         session.phase = .displayGuard
@@ -801,29 +791,13 @@ final class ResponslyCore: @unchecked Sendable {
             logger.debug("survey \(session.survey.id): the display guard did not answer in time, showing")
         }
         if allow {
-            makeVisible(session)
+            load(session)
         } else {
-            // The loaded page is discarded.
-            cancelBeforeVisible(session, reason: .vetoed)
+            fail(session, .vetoed)
         }
     }
 
-    /// The survey becomes visible: this is the moment a display is counted (protocol section 4.4).
-    private func makeVisible(_ session: SurveySession) {
-        guard var current = state else { return }
-        let surveyId = session.survey.id
-        session.phase = .visible
-        current.recordDisplayed(surveyId: surveyId, auto: session.isAuto, at: env.now())
-        commit(current)
-        telemetry?.enqueue(type: .displayed, surveyId: surveyId)
-        env.presenter.reveal(sessionId: session.id)
-        logger.debug("survey \(surveyId): shown")
-        let event = ResponslySurveyShownEvent(survey: session.publicSurvey, trigger: session.trigger)
-        notify { $0.surveyShown(event) }
-    }
-
-    /// Hands the survey to the UI layer, which loads it hidden. On `ready` the display guard is
-    /// asked and the survey becomes visible.
+    /// Hands the survey to the UI layer, which loads it hidden; it becomes visible on `ready`.
     private func load(_ session: SurveySession) {
         guard let state = state, let origin = WebOrigin(url: session.survey.url) else {
             fail(session, .loadFailed)
@@ -881,7 +855,6 @@ final class ResponslyCore: @unchecked Sendable {
         }
     }
 
-    /// Only the wait for `ready` is timed; the timer is cancelled when `ready` arrives.
     private func loadTimedOut(sessionId: UUID) {
         guard let session = session, session.id == sessionId, session.phase == .loading else { return }
         logger.info("survey \(session.survey.id): no `ready` within \(Int(ResponslyCore.loadTimeout)) s")
@@ -897,14 +870,14 @@ final class ResponslyCore: @unchecked Sendable {
 
         case .loadFailed(let description):
             switch session.phase {
-            case .loading, .displayGuard:
+            case .loading:
                 logger.info("survey \(session.survey.id): load failed (\(description))")
                 cancelBeforeVisible(session, reason: .loadFailed)
             case .visible:
                 let errorEvent = ResponslySurveyErrorEvent(surveyId: session.survey.id, code: "load_failed", message: description)
                 notify { $0.surveyError(errorEvent) }
                 closeVisible(session)
-            case .delay:
+            case .delay, .displayGuard:
                 break
             }
 
@@ -925,18 +898,27 @@ final class ResponslyCore: @unchecked Sendable {
         let surveyId = session.survey.id
         switch message {
         case .ready:
-            guard session.phase == .loading else { return }
-            pageBecameReady(session)
+            guard session.phase == .loading, var current = state else { return }
+            session.timer?.cancel()
+            session.timer = nil
+            session.phase = .visible
+            current.recordDisplayed(surveyId: surveyId, auto: session.isAuto, at: env.now())
+            commit(current)
+            telemetry?.enqueue(type: .displayed, surveyId: surveyId)
+            env.presenter.reveal(sessionId: session.id)
+            logger.debug("survey \(surveyId): shown")
+            let event = ResponslySurveyShownEvent(survey: session.publicSurvey, trigger: session.trigger)
+            notify { $0.surveyShown(event) }
 
         case .error(let code, let text):
             switch session.phase {
-            case .loading, .displayGuard:
-                logger.info("survey \(surveyId): the page reported \(code) before it was shown")
+            case .loading:
+                logger.info("survey \(surveyId): the page reported \(code) before it was ready")
                 cancelBeforeVisible(session, reason: .surveyUnavailable)
             case .visible:
                 let event = ResponslySurveyErrorEvent(surveyId: surveyId, code: code, message: text)
                 notify { $0.surveyError(event) }
-            case .delay:
+            case .delay, .displayGuard:
                 break
             }
 
@@ -971,9 +953,9 @@ final class ResponslyCore: @unchecked Sendable {
             switch session.phase {
             case .visible:
                 closeVisible(session)
-            case .loading, .displayGuard:
+            case .loading:
                 cancelBeforeVisible(session, reason: .surveyUnavailable)
-            case .delay:
+            case .delay, .displayGuard:
                 break
             }
 
@@ -994,16 +976,17 @@ final class ResponslyCore: @unchecked Sendable {
         switch session.phase {
         case .visible:
             closeVisible(session)
-        case .delay, .loading, .displayGuard:
-            // It was never shown, so it is cancelled silently: no state change, no telemetry,
-            // no callback.
+        case .delay, .displayGuard, .loading:
+            // It was never displayed: no counters, no telemetry.
             session.timer?.cancel()
             session.timer = nil
-            if session.hasHiddenPage {
+            if session.phase == .loading {
                 env.presenter.dismiss(sessionId: session.id, animated: false)
             }
             self.session = nil
-            logger.debug("survey \(session.survey.id): cancelled before it became visible")
+            logger.debug("survey \(session.survey.id): closed before it became visible")
+            let event = ResponslySurveyDismissedEvent(surveyId: session.survey.id)
+            notify { $0.surveyDismissed(event) }
         }
     }
 
@@ -1034,10 +1017,9 @@ final class ResponslyCore: @unchecked Sendable {
         notify { $0.surveyDismissed(event) }
     }
 
-    /// A survey that was not visible yet is abandoned and its page, if any, discarded.
-    /// Changes no state.
+    /// A survey that was loading is abandoned. Changes no state.
     private func cancelBeforeVisible(_ session: SurveySession, reason: ResponslyNotShownReason) {
-        if session.hasHiddenPage {
+        if session.phase == .loading {
             env.presenter.dismiss(sessionId: session.id, animated: false)
         }
         fail(session, reason)

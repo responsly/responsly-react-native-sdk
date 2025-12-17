@@ -2,6 +2,12 @@
 
 All notable changes to this SDK are documented here.
 
+## [1.0.0] - 2025-12-17
+
+- First stable release.
+
+- First stable SDK release with installation guides.
+
 ## [0.9.5] - 2025-12-07
 
 - Verify JavaScript calls events values navigation and plugin behavior.

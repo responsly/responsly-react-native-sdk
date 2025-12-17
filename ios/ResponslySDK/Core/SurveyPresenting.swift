@@ -37,7 +37,7 @@ protocol SurveyPresenting: AnyObject {
     /// Creates the container and the WebView, hidden, and starts loading.
     /// The handler may be called on any thread.
     func present(_ request: SurveyPresentationRequest, eventHandler: @escaping (SurveyPresentationEvent) -> Void)
-    /// Makes the container visible (the page reported `ready` and the display guard allowed it).
+    /// Makes the container visible (the page reported `ready`).
     func reveal(sessionId: UUID)
     /// Shows the close button and accepts a backdrop tap even when the survey is not dismissible
     /// (the page reported `completed`).
