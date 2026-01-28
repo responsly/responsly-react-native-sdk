@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [1.1.0] - 2026-01-28
+
+- Synchronize native SDK sources and packages.
+
 ## [1.0.0] - 2025-12-17
 
 - First stable release.

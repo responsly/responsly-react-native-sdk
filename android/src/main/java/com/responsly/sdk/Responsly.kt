@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 public object Responsly {
     /** Version of this SDK. */
-    public const val SDK_VERSION: String = "1.0.0"
+    public const val SDK_VERSION: String = "1.1.0"
 
     private val logger = Logger(AndroidLogSink)
     private val scheduler = AndroidScheduler(logger)
