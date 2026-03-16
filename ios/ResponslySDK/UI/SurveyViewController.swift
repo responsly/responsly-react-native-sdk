@@ -229,7 +229,7 @@ final class SurveyViewController: UIViewController {
 
     // MARK: - Driven by the presenter
 
-    /// The page reported `ready`: slide the sheet in, fade the others; fade only with reduced motion.
+    /// The survey may appear: slide the sheet in, fade the others; fade only with reduced motion.
     func reveal() {
         guard !isRevealed, !isClosing else { return }
         isRevealed = true

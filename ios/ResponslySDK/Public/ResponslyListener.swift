@@ -11,7 +11,7 @@ public protocol ResponslyListener {
     @MainActor func surveyNotShown(_ event: ResponslySurveyNotShownEvent)
     @MainActor func questionAnswered(_ event: ResponslyQuestionAnsweredEvent)
     @MainActor func surveyCompleted(_ event: ResponslySurveyCompletedEvent)
-    /// The survey was closed before it was completed.
+    /// A survey that was shown was closed before it was completed.
     @MainActor func surveyDismissed(_ event: ResponslySurveyDismissedEvent)
     /// The survey page reported an error after it became visible.
     @MainActor func surveyError(_ event: ResponslySurveyErrorEvent)

@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 public object Responsly {
     /** Version of this SDK. */
-    public const val SDK_VERSION: String = "1.1.0"
+    public const val SDK_VERSION: String = "1.1.1"
 
     private val logger = Logger(AndroidLogSink)
     private val scheduler = AndroidScheduler(logger)
@@ -48,7 +48,9 @@ public object Responsly {
 
     /**
      * Starts the SDK. Call it once, as early as possible, typically in `Application.onCreate`.
-     * Calling it again with the same key does nothing; a different key resets the stored state first.
+     * Calling it again with the same key and API host does nothing. A different key resets the
+     * stored state first; the same key with another [ResponslyOptions.apiHost] switches to that
+     * host, drops the cached configuration and downloads it again.
      *
      * @param context any context; the application context is used.
      * @param sdkKey the team's SDK key (`rsk_...`).
@@ -125,7 +127,10 @@ public object Responsly {
         core.showSurvey(surveyId, options)
     }
 
-    /** Closes the visible survey (counted as dismissed unless completed) or cancels one that is about to show. */
+    /**
+     * Closes the visible survey (counted as dismissed unless completed). A survey that is still
+     * waiting or loading is cancelled silently: it was never shown, so nothing is recorded or reported.
+     */
     @JvmStatic
     public fun closeSurvey() {
         core.closeSurvey()

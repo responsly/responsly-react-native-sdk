@@ -15,7 +15,7 @@ public final class Responsly: @unchecked Sendable {
     public static let shared = Responsly()
 
     /// The version of this SDK.
-    public static let sdkVersion: String = "1.1.0"
+    public static let sdkVersion: String = "1.1.1"
 
     private let core: ResponslyCore
     private let lifecycleObserver: AnyObject?
@@ -65,7 +65,9 @@ public final class Responsly: @unchecked Sendable {
         core.showSurvey(surveyId, options: options)
     }
 
-    /// Closes the survey that is visible or about to be shown.
+    /// Closes the visible survey; closing it before it is completed counts as dismissed.
+    /// A survey that is not on screen yet (waiting for its delay or still loading) is cancelled
+    /// silently: no callback, because it was never shown.
     public func closeSurvey() {
         core.closeSurvey()
     }
@@ -103,9 +105,10 @@ public final class Responsly: @unchecked Sendable {
         core.reset()
     }
 
-    /// A last say before a survey becomes visible. The guard is called on the main thread with the
-    /// survey and a `decide` closure: `decide(false)` vetoes the survey. No answer within
-    /// 2 seconds counts as "allow". Not asked for `showSurvey(…, force: true)`.
+    /// A last say right before a survey becomes visible. When the survey has loaded, the guard is
+    /// called on the main thread with the survey and a `decide` closure: `decide(false)` vetoes
+    /// it (`surveyNotShown` with `vetoed`). No answer within 2 seconds counts as "allow".
+    /// Not asked for `showSurvey(…, force: true)`.
     public func setDisplayGuard(_ `guard`: ((ResponslySurvey, @escaping (Bool) -> Void) -> Void)?) {
         core.setDisplayGuard(`guard`)
     }
