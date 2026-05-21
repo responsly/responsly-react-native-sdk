@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [1.2.0] - 2026-05-21
+
+- Update native survey presentation.
+
 ## [1.1.1] - 2026-03-16
 
 - Sync native configuration and survey lifecycle fixes.

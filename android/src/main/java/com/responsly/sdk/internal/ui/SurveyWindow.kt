@@ -264,6 +264,13 @@ internal class SurveyWindow(
         window.setFormat(PixelFormat.TRANSLUCENT)
         window.setWindowAnimations(0)
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        // A dialog takes hardware acceleration from its activity. A host that turns it off there
+        // (Unity's player activity does) would give the survey a software-rendered WebView, so
+        // the window asks for it itself; this has to happen before the window is shown.
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+        )
         // Until the survey is revealed the window must not take focus or touches from the app.
         window.addFlags(
             WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS or
