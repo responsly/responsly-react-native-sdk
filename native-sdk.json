@@ -1,15 +1,15 @@
 {
   "ios": {
     "repository": "https://github.com/responsly/responsly-ios-sdk",
-    "commit": "3acc96f2e6602d284401c64fab209d0dd2029f19",
+    "commit": "903dd33ccd48eebd639ed7a307106dcfd1aa06e8",
     "dirty": false,
-    "version": "1.2.0"
+    "version": "1.2.1"
   },
   "android": {
     "repository": "https://github.com/responsly/responsly-android-sdk",
-    "commit": "b8555ed48d47b1a79e825f8b3d69c39f262d2c08",
+    "commit": "2398368962210a1d63e20a466af72fd5180f50aa",
     "dirty": false,
-    "version": "1.2.0",
+    "version": "1.2.1",
     "dependencies": {
       "androidx.webkit:webkit": "1.15.0",
       "androidx.annotation:annotation": "1.9.1"

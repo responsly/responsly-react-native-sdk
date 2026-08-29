@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are documented here.
 
+## [1.2.1] - 2026-08-29
+
+- Release version 1.2.1.
+
 ## [1.2.0] - 2026-05-21
 
 - Update native survey presentation.

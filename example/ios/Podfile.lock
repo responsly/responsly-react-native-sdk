@@ -1813,7 +1813,7 @@ PODS:
     - React-utils (= 0.88.1)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.88.1)
-  - ResponslyReactNative (1.2.0):
+  - ResponslyReactNative (1.2.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
