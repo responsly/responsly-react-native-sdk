@@ -1,4 +1,27 @@
-import { toISODate, toNativeTraits } from '../values';
+import {
+  toISODate,
+  toNativeHiddenFields,
+  toNativeProperties,
+  toNativeTraits,
+} from '../values';
+
+describe.each([
+  ['traits', (values: Record<string, string>) => toNativeTraits(values).values],
+  ['event properties', toNativeProperties],
+  ['hidden fields', toNativeHiddenFields],
+] as const)('%s', (_name, encode) => {
+  it('preserves __proto__ as an own field without changing the object prototype', () => {
+    const input = JSON.parse('{"__proto__":"campaign","plan":"pro"}');
+
+    const encoded = encode(input);
+
+    expect(Object.keys(encoded)).toEqual(['__proto__', 'plan']);
+    expect(encoded.__proto__).toBe('campaign');
+    expect(encoded.plan).toBe('pro');
+    expect(Object.getPrototypeOf(encoded)).toBe(Object.prototype);
+    expect(Object.keys(input)).toEqual(['__proto__', 'plan']);
+  });
+});
 
 describe('toISODate', () => {
   it('formats in UTC with seconds precision', () => {

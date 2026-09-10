@@ -27,6 +27,19 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function setOwnValue<T>(
+  target: Record<string, T>,
+  key: string,
+  value: T
+): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+}
+
 /**
  * ISO 8601 in UTC with seconds precision, for example `2026-11-10T12:00:00Z`: the format the
  * native SDKs store and compare dates in. `null` for an invalid date.
@@ -85,7 +98,7 @@ export function toNativeTraits(
       );
       continue;
     }
-    values[key] = value;
+    setOwnValue(values, key, value);
   }
   return { values, removed };
 }
@@ -110,7 +123,7 @@ export function toNativeProperties(
       );
       continue;
     }
-    values[key] = value;
+    setOwnValue(values, key, value);
   }
   return values;
 }
@@ -126,11 +139,11 @@ export function toNativeHiddenFields(
   for (const key of Object.keys(fields)) {
     const raw = fields[key];
     if (typeof raw === 'string') {
-      result[key] = raw;
+      setOwnValue(result, key, raw);
     } else if (typeof raw === 'boolean') {
-      result[key] = String(raw);
+      setOwnValue(result, key, String(raw));
     } else if (typeof raw === 'number' && Number.isFinite(raw)) {
-      result[key] = String(raw);
+      setOwnValue(result, key, String(raw));
     } else if (raw !== undefined && raw !== null) {
       warn(`The hidden field "${key}" was skipped: values are strings.`);
     }
