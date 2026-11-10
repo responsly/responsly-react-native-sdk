@@ -14,8 +14,10 @@ internal object Conditions {
     fun matchesAny(conditions: List<Condition>, values: Map<String, Any?>): Boolean =
         conditions.any { evaluate(it, values) }
 
-    fun evaluate(condition: Condition, values: Map<String, Any?>): Boolean =
-        evaluate(condition.op, condition.name?.let(values::get), condition.value)
+    fun evaluate(condition: Condition, values: Map<String, Any?>): Boolean {
+        val name = condition.name ?: return false
+        return evaluate(condition.op, values[name], condition.value)
+    }
 
     fun evaluate(op: String, actual: Any?, expected: Any?): Boolean = when (op) {
         "exists" -> actual != null

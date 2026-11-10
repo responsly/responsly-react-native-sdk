@@ -306,9 +306,13 @@ final class ResponslyCore: @unchecked Sendable {
                     return
                 }
                 logger.info("initialize: API host changed to \(options.apiHost.absoluteString), fetching the configuration again")
+                if let session = session, session.phase != .visible {
+                    endSession(session)
+                }
                 makeClient(key: key, apiHost: options.apiHost)
                 dropConfig()
                 configBlocked = false
+                appLaunchEvaluated = false
                 refreshConfigIfNeeded()
                 return
             }

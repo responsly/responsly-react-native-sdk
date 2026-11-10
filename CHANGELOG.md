@@ -2,9 +2,13 @@
 
 All notable changes to this SDK are documented here.
 
-## [Unreleased]
+## [1.2.2] - 2026-11-10
 
 - Preserve `__proto__` keys in traits, event properties and hidden fields sent to the native SDKs.
+
+### Changed
+
+- Update the bundled iOS and Android SDKs to 1.2.2.
 
 ## [1.2.1] - 2026-08-29
 
