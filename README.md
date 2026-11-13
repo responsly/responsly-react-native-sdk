@@ -130,7 +130,7 @@ The default export is the SDK object. All calls are its methods.
 | `setAttributes(traits)` | Merges traits without changing the user ID. A `null` value removes a trait. |
 | `track(event, properties?)` | Adds one to the event's count and evaluates event triggers. |
 | `screen(name)` | Sets the current screen and evaluates screen triggers. |
-| `showSurvey(surveyId, options?)` | Shows a survey by its Survey ID. Options: `force`, `hiddenFields`, `locale`, `presentation` (`'bottom_sheet'`, `'dialog'`, `'fullscreen'`). Audience, schedule and frequency apply unless `force` is set. Before `initialize` it reports `not_initialized`. |
+| `showSurvey(surveyId, options?)` | Shows a survey by its Survey ID from the form's **Share → Mobile app** tab (a form with several configurations has one for each). Options: `force`, `hiddenFields`, `locale`, `presentation` (`'bottom_sheet'`, `'dialog'`, `'fullscreen'`). Audience, schedule and frequency apply unless `force` is set. Before `initialize` it reports `not_initialized`. |
 | `closeSurvey()` | Closes the survey that is visible or waiting to appear. A visible survey counts as dismissed unless it was completed; one that was still waiting is cancelled without a callback. |
 | `pause()` / `resume()` | Stops and resumes surveys started by triggers. `showSurvey` still works while paused. Kept in memory only. |
 | `setLocale(tag)` | Overrides the language for surveys and for the languages audience rule. `null` returns to the device language. |
