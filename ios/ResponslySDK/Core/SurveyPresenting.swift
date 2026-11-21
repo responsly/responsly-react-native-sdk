@@ -25,9 +25,12 @@ enum SurveyPresentationEvent {
     case message(BridgeMessage, raw: String)
     /// The main-frame load failed, or the survey could not be put on screen.
     case loadFailed(String)
-    /// The main frame tried to leave the survey (the URL was opened in the system browser when
-    /// the survey was visible).
+    /// The user tapped a link that leaves the survey; it was opened outside the app.
     case navigatedAway(URL)
+    /// The visible survey tried to leave without a tap on a link (a script, a redirect, an
+    /// automatic redirect of the ending screen), or to an address of another kind than http,
+    /// https, mailto, tel or sms. Nothing was opened and the survey stays.
+    case navigationBlocked(scheme: String)
     /// The close button or the backdrop was tapped; the container is already closing.
     case closedByUser
 }

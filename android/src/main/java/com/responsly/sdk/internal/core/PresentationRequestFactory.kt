@@ -5,6 +5,7 @@ import com.responsly.sdk.SurveyTrigger
 import com.responsly.sdk.internal.bridge.SurveyContext
 import com.responsly.sdk.internal.bridge.SurveyUrl
 import com.responsly.sdk.internal.config.SurveyConfig
+import com.responsly.sdk.internal.net.TransportSecurity
 import com.responsly.sdk.internal.state.SdkState
 
 /** Resolves per-show overrides and builds the context passed to the survey page. */
@@ -18,6 +19,8 @@ internal object PresentationRequestFactory {
         platform: String,
         sdkVersion: String,
     ): PresentationRequest? {
+        // Only https, or plain http on a local development host.
+        if (!TransportSecurity.isAllowed(survey.url)) return null
         val origin = SurveyUrl.origin(survey.url) ?: return null
         // Only a locale that was set explicitly goes into the URL.
         val explicitLocale = options?.locale?.trim()?.takeIf { it.isNotEmpty() } ?: state.locale

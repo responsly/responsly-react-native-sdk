@@ -14,6 +14,12 @@ internal sealed class ConfigResponse {
     /** `401`: the SDK key is not valid. */
     object InvalidKey : ConfigResponse()
 
+    /**
+     * Another `3xx`: the API host redirects. Redirects are not followed, so that the SDK key never
+     * reaches another address.
+     */
+    class Redirected(val status: Int) : ConfigResponse()
+
     class Failed(val reason: String) : ConfigResponse()
 }
 
@@ -55,6 +61,7 @@ internal class HttpSdkApi(
                     ConfigResponse.Ok(readText(connection.inputStream), connection.getHeaderField("ETag"))
                 HttpURLConnection.HTTP_NOT_MODIFIED -> ConfigResponse.NotModified
                 HttpURLConnection.HTTP_UNAUTHORIZED -> ConfigResponse.InvalidKey
+                in 300..399 -> ConfigResponse.Redirected(status)
                 else -> ConfigResponse.Failed("HTTP $status")
             }
         } catch (e: Exception) {

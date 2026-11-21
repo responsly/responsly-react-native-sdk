@@ -96,6 +96,9 @@ final class SurveyViewController: UIViewController {
         // JavaScript and DOM storage are on by default; the default store keeps cookies.
         configuration.websiteDataStore = .default()
         configuration.allowsInlineMediaPlayback = true
+        // `window.open` only from a tap (the system default on iOS, stated here because the
+        // navigation policy relies on it).
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         let applicationName = configuration.applicationNameForUserAgent ?? "Mobile/15E148"
         configuration.applicationNameForUserAgent = applicationName + request.userAgentSuffix
 
@@ -347,12 +350,18 @@ final class SurveyViewController: UIViewController {
     }
 
     /// The main frame tried to go somewhere else, or a link asked for a new window.
-    private func leaveSurvey(for url: URL) {
+    /// - Parameter userInitiated: a tap on a link (`linkActivated`), or a new window, which
+    ///   WebKit opens only from a tap.
+    private func leaveSurvey(for url: URL, userInitiated: Bool) {
         guard !isClosing else { return }
         guard isRevealed else {
             // Nothing is on screen yet, so nobody asked to go anywhere: do not throw the user
             // into the browser, give up on the survey instead.
             reportLoadFailure("the survey page redirected away from the survey URL")
+            return
+        }
+        guard NavigationPolicy.mayOpenExternally(url, userInitiated: userInitiated) else {
+            onEvent?(.navigationBlocked(scheme: url.scheme?.lowercased() ?? ""))
             return
         }
         UIApplication.shared.open(url, options: [:], completionHandler: nil)
@@ -501,7 +510,7 @@ extension SurveyViewController: WKNavigationDelegate {
         case .openExternally:
             decisionHandler(.cancel)
             if let url = url {
-                leaveSurvey(for: url)
+                leaveSurvey(for: url, userInitiated: navigationAction.navigationType == .linkActivated)
             }
         }
     }
@@ -551,7 +560,7 @@ extension SurveyViewController: WKUIDelegate {
             url: url, surveyURL: request.surveyURL, isMainFrame: false, opensNewWindow: true
         )
         if decision == .openExternally, let url = url {
-            leaveSurvey(for: url)
+            leaveSurvey(for: url, userInitiated: true)
         }
         return nil
     }

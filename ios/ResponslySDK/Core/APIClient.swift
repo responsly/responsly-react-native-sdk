@@ -17,6 +17,9 @@ enum ConfigFetchResult: Equatable {
     case notModified
     /// `401`: drop the cache, show nothing, do not retry until the next launch.
     case invalidKey
+    /// Another `3xx`: the API host redirects. Redirects are not followed, so that the SDK key never
+    /// reaches another address; keep the cached copy.
+    case redirected(status: Int)
     /// Any other status, a network error or an unreadable body: keep the cached copy.
     case failed(String)
 }
@@ -81,6 +84,8 @@ final class APIClient {
                     completion(.notModified)
                 case 401:
                     completion(.invalidKey)
+                case 300..<400:
+                    completion(.redirected(status: status))
                 default:
                     completion(.failed("HTTP \(status)"))
                 }

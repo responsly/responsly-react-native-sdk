@@ -1,6 +1,7 @@
 package com.responsly.sdk.internal.ui
 
 import android.app.Activity
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -114,6 +115,7 @@ internal class UploadGrants(private val context: Context) {
             for (index in 0 until clip.itemCount) clip.getItemAt(index).uri?.let(uris::add)
         }
         if (uris.isEmpty()) data?.data?.let(uris::add)
+        uris.retainAll(::isPickedDocument)
         if (uris.isEmpty()) return null
 
         val resolver = context.contentResolver
@@ -130,6 +132,22 @@ internal class UploadGrants(private val context: Context) {
         }
         remember(context, taken)
         return uris.toTypedArray()
+    }
+
+    /**
+     * A document from a provider, never a file path, and never one of the app's own providers:
+     * the document picker has no reason to return those, and the page would upload the app's data.
+     */
+    private fun isPickedDocument(uri: Uri): Boolean {
+        if (uri.scheme?.lowercase(Locale.ROOT) != ContentResolver.SCHEME_CONTENT) return false
+        val authority = uri.authority?.takeIf { it.isNotEmpty() } ?: return false
+        val provider = try {
+            @Suppress("DEPRECATION")
+            context.packageManager.resolveContentProvider(authority, 0)
+        } catch (e: Exception) {
+            null
+        }
+        return provider?.packageName != context.packageName
     }
 
     fun releaseAll() {

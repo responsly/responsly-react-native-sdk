@@ -2,6 +2,17 @@
 
 All notable changes to this SDK are documented here.
 
+## [1.2.3] - 2026-11-21
+
+### Security
+
+- Update the bundled iOS and Android SDKs to 1.2.3: API requests no longer follow redirects, survey links open outside the app only after a tap and only for `http`, `https`, `mailto`, `tel` and `sms`, `apiHost` and survey addresses must use https (plain http only for local development hosts), and debug logs no longer print answers.
+- A display guard that returns a broken promise, or one that settles more than once, answers once and lets the survey through.
+
+### Changed
+
+- Update the development `glob` dependency of the build tooling to a patched version.
+
 ## [1.2.2] - 2026-11-10
 
 - Preserve `__proto__` keys in traits, event properties and hidden fields sent to the native SDKs.

@@ -12,6 +12,18 @@ enum NavigationPolicy {
     /// Schemes that must never be handed to the system.
     private static let inertSchemes: Set<String> = ["about", "blob", "data", "javascript", "file"]
 
+    /// The only schemes a survey may open outside the app. Custom schemes, the host app's own
+    /// deep links among them, are never opened.
+    static let externalSchemes: Set<String> = ["http", "https", "mailto", "tel", "sms"]
+
+    /// Whether a navigation that leaves the visible survey is handed to the system: only after a
+    /// tap on a link, and only for `externalSchemes`. A page script, a server redirect or a
+    /// `<meta http-equiv="refresh">` never opens anything by itself.
+    static func mayOpenExternally(_ url: URL, userInitiated: Bool) -> Bool {
+        guard userInitiated, let scheme = url.scheme?.lowercased() else { return false }
+        return externalSchemes.contains(scheme)
+    }
+
     /// - Parameters:
     ///   - isMainFrame: the navigation targets the main frame.
     ///   - opensNewWindow: the navigation asks for a new window (`target="_blank"`, `window.open`).

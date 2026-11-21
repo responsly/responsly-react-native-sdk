@@ -7,6 +7,7 @@ import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.RippleDrawable
@@ -31,7 +32,6 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -41,6 +41,8 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import androidx.annotation.RequiresApi
 import androidx.webkit.WebMessageCompat
+import androidx.webkit.WebResourceErrorCompat
+import androidx.webkit.WebViewClientCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.responsly.sdk.PresentationStyle
@@ -546,33 +548,44 @@ internal class SurveyWindow(
         events.onBridgeMessage(token, parsed)
     }
 
-    /** Section 5.4. Returns true when the navigation was cancelled. */
-    private fun onMainFrameNavigation(url: String): Boolean {
+    /**
+     * Section 5.4. Returns true when the navigation was cancelled.
+     *
+     * @param userGesture the navigation comes from a tap. A page script, a server redirect or a
+     *   `<meta http-equiv="refresh">` never opens anything outside the survey by itself.
+     */
+    private fun onMainFrameNavigation(url: String, userGesture: Boolean): Boolean {
         if (SurveyUrl.isSurveyPage(request.surveyUrl, url)) return false
         if (!revealed) {
             // Nobody tapped a link in a page nobody sees: this is a redirect, not a survey.
             fail("navigation", "The page left the survey address before it was ready")
-        } else {
-            openExternally(url)
+        } else if (!userGesture) {
+            logger.info {
+                "navigation: the page tried to open a \"${schemeOf(url).take(20)}\" address without a tap on a link; it was not opened"
+            }
+        } else if (openExternally(url)) {
             events.onNavigatedAway(token)
         }
         return true
     }
 
-    private fun openExternally(url: String) {
-        val uri = Uri.parse(url)
-        val scheme = uri.scheme?.lowercase(Locale.ROOT)
+    /** Hands [url] to another app. False when its scheme is not one a survey may open. */
+    private fun openExternally(url: String): Boolean {
+        val scheme = schemeOf(url)
         if (scheme !in EXTERNAL_SCHEMES) {
-            logger.debug { "navigation: blocked a \"$scheme\" link" }
-            return
+            logger.info { "navigation: a \"${scheme.take(20)}\" link is not opened" }
+            return false
         }
         logger.debug { "navigation: opening a \"$scheme\" link outside the survey" }
         try {
-            activity.startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
         } catch (e: Exception) {
             logger.info { "navigation: no app can open the link" }
         }
+        return true
     }
+
+    private fun schemeOf(url: String): String = Uri.parse(url).scheme?.lowercase(Locale.ROOT).orEmpty()
 
     private fun fail(code: String, detail: String) {
         if (!destroyed) events.onFailure(token, code, detail)
@@ -590,18 +603,44 @@ internal class SurveyWindow(
         }
     }
 
-    private inner class Client : WebViewClient() {
+    /**
+     * [WebViewClientCompat] delivers the [WebResourceRequest] variant of shouldOverrideUrlLoading,
+     * with the frame and the gesture, also on API 23 when the WebView supports it.
+     */
+    private inner class Client : WebViewClientCompat() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             if (!request.isForMainFrame) return false
-            return onMainFrameNavigation(request.url.toString())
+            return onMainFrameNavigation(request.url.toString(), request.hasGesture())
         }
 
-        // API 23 only knows this variant.
+        /**
+         * Only a WebView too old to report the request calls this (API 23). It says neither which
+         * frame navigates nor whether the user tapped: http(s) loads go on, and [onPageStarted]
+         * keeps the main frame on the survey; nothing else is opened.
+         */
         @Deprecated("Deprecated in Java")
-        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = onMainFrameNavigation(url)
+        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+            val scheme = schemeOf(url)
+            return scheme != "http" && scheme != "https"
+        }
 
-        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-            if (request.isForMainFrame) fail("load_error", "${error.errorCode} ${error.description}")
+        /**
+         * shouldOverrideUrlLoading is not asked about a form sent with POST, nor, on an old
+         * WebView, told which frame navigates. Whatever gets here, the main frame stays on the
+         * survey: anything else stops the survey.
+         */
+        override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+            if (url == null || SurveyUrl.isSurveyPage(request.surveyUrl, url)) return
+            view.stopLoading()
+            fail("navigation", "The page left the survey address")
+        }
+
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceErrorCompat) {
+            if (!request.isForMainFrame) return
+            val code = if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_RESOURCE_ERROR_GET_CODE)) error.errorCode else 0
+            val description =
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_RESOURCE_ERROR_GET_DESCRIPTION)) error.description else ""
+            fail("load_error", "$code $description")
         }
 
         override fun onReceivedHttpError(
@@ -662,10 +701,10 @@ internal class SurveyWindow(
                     return true
                 }
 
+                // The window was opened by a tap (see the check above).
                 private fun redirect(url: String) {
                     if (destroyed) return
-                    openExternally(url)
-                    events.onNavigatedAway(token)
+                    if (openExternally(url)) events.onNavigatedAway(token)
                     handler.post {
                         if (popups.remove(popup)) destroyWebView(popup)
                     }

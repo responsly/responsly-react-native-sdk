@@ -24,6 +24,7 @@ import com.responsly.sdk.internal.config.ConfigParser
 import com.responsly.sdk.internal.config.SdkConfig
 import com.responsly.sdk.internal.net.ConfigResponse
 import com.responsly.sdk.internal.net.SdkApi
+import com.responsly.sdk.internal.net.TransportSecurity
 import com.responsly.sdk.internal.objects
 import com.responsly.sdk.internal.state.KeyValueStorage
 import com.responsly.sdk.internal.state.StateStore
@@ -252,6 +253,13 @@ internal class ResponslyCore(
             return
         }
         val host = options.apiHost.trim().trimEnd('/')
+        if (!TransportSecurity.isAllowed(host)) {
+            logger.error(
+                "initialize: the API host must be an https address (plain http only for a local " +
+                    "development host): $host; the call is ignored",
+            )
+            return
+        }
         var store = this.store
         if (store != null && sdkKey == key) {
             if (apiHost == host) {
@@ -429,6 +437,10 @@ internal class ResponslyCore(
                 failPendingShows()
                 pendingCalls.clear()
             }
+            is ConfigResponse.Redirected -> logger.error(
+                "config: the API host answered HTTP ${response.status} with a redirect. " +
+                    "Redirects are not followed: set apiHost to the address it redirects to",
+            )
             is ConfigResponse.Failed -> logger.info {
                 val fallback = if (config != null) "keeping the cached copy" else "no cached copy"
                 "config: fetch failed (${response.reason}); $fallback"
@@ -625,7 +637,8 @@ internal class ResponslyCore(
 
     private fun handleBridgeMessage(active: SurveySession, message: BridgeMessage) {
         val payload = message.payload
-        logger.debug { "bridge: ${message.type} ${payload.toString().take(MAX_LOGGED_PAYLOAD)}" }
+        // The type only: payloads carry the respondent's answers.
+        logger.debug { "bridge: ${message.type.take(MAX_LOGGED_TYPE)}" }
         val surveyId = active.survey.id
         when (message.type) {
             BridgeMessage.READY -> if (active.phase == SurveyPhase.LOADING) onReady(active)
@@ -823,7 +836,7 @@ internal class ResponslyCore(
         const val GUARD_TIMEOUT_MILLIS = 2_000L
         const val MAX_PENDING_CALLS = 50
         const val MAX_REMEMBERED_CALLS = 200
-        private const val MAX_LOGGED_PAYLOAD = 500
+        private const val MAX_LOGGED_TYPE = 40
         private const val TELEMETRY_DISPLAYED = "displayed"
         private const val TELEMETRY_COMPLETED = "completed"
         private const val TELEMETRY_DISMISSED = "dismissed"

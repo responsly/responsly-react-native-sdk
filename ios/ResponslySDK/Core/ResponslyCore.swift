@@ -208,6 +208,10 @@ final class ResponslyCore: @unchecked Sendable {
             logger.error("initialize: the SDK key is empty")
             return
         }
+        guard TransportSecurity.isAllowed(options.apiHost) else {
+            logger.error("initialize: the API host must be an https address (plain http only for a local development host): \(options.apiHost.absoluteString)")
+            return
+        }
 
         if let currentKey = sdkKey {
             if currentKey == key {
@@ -369,15 +373,24 @@ final class ResponslyCore: @unchecked Sendable {
                 cancelBeforeVisible(session, reason: .configUnavailable)
             }
 
+        case .redirected(let status):
+            logger.error("config: the API host answered HTTP \(status) with a redirect. Redirects are not followed: set apiHost to the address it redirects to")
+            configFetchFailed()
+
         case .failed(let message):
             logger.info("config: fetch failed (\(message)); will retry on the next foreground")
-            if config == nil {
-                // Trigger calls stay queued for the retry; an explicit request gets its answer now.
-                failPendingManualCalls(.configUnavailable)
-            } else {
-                // The cached copy is all there is: answer what was waiting for the refresh.
-                configBecameAvailable()
-            }
+            configFetchFailed()
+        }
+    }
+
+    /// A fetch that brought no configuration; the next foreground tries again.
+    private func configFetchFailed() {
+        if config == nil {
+            // Trigger calls stay queued for the retry; an explicit request gets its answer now.
+            failPendingManualCalls(.configUnavailable)
+        } else {
+            // The cached copy is all there is: answer what was waiting for the refresh.
+            configBecameAvailable()
         }
     }
 
@@ -805,8 +818,9 @@ final class ResponslyCore: @unchecked Sendable {
     private func onPresentationEvent(_ event: SurveyPresentationEvent, sessionId: UUID) {
         guard let session = session, session.id == sessionId else { return }
         switch event {
-        case .message(let message, let raw):
-            logger.debug("bridge: \(ResponslyCore.truncated(raw))")
+        case .message(let message, _):
+            // The type only: payloads carry the respondent's answers.
+            logger.debug("bridge: \(message.type.prefix(40))")
             onBridgeMessage(message, session: session)
 
         case .loadFailed(let description):
@@ -823,11 +837,14 @@ final class ResponslyCore: @unchecked Sendable {
             }
 
         case .navigatedAway(let url):
-            logger.debug("survey \(session.survey.id): navigation away to \(url.absoluteString)")
+            logger.debug("survey \(session.survey.id): navigation away to \(url.scheme ?? "?")://\(url.host ?? "")")
             // After `completed`, leaving the survey closes it.
             if session.phase == .visible, session.completed {
                 closeVisible(session)
             }
+
+        case .navigationBlocked(let scheme):
+            logger.info("survey \(session.survey.id): the page tried to open a \"\(scheme.prefix(20))\" address without a tap on a link; it was not opened")
 
         case .closedByUser:
             guard session.phase == .visible else { return }
@@ -992,9 +1009,5 @@ final class ResponslyCore: @unchecked Sendable {
             return "\(trigger.type.rawValue) \"\(name)\""
         }
         return trigger.type.rawValue
-    }
-
-    private static func truncated(_ raw: String, limit: Int = 400) -> String {
-        raw.count > limit ? String(raw.prefix(limit)) + "…" : raw
     }
 }

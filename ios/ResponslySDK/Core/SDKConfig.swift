@@ -86,8 +86,7 @@ struct SurveyConfig: Equatable {
               let id = object["id"] as? String, !id.isEmpty,
               let urlString = object["url"] as? String,
               let url = URL(string: urlString),
-              let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http",
-              let host = url.host, !host.isEmpty
+              TransportSecurity.isAllowed(url)
         else { return nil }
 
         self.init(id: id, url: url)
