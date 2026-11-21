@@ -152,6 +152,42 @@ describe('setDisplayGuard', () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
 
+  it('allows when reading the returned promise throws', async () => {
+    Responsly.setDisplayGuard((() => ({
+      get then() {
+        throw new Error('broken promise');
+      },
+    })) as never);
+
+    expect(() => askGuard('broken-promise')).not.toThrow();
+    await flush();
+
+    expect(native.resolveDisplayGuard).toHaveBeenCalledTimes(1);
+    expect(native.resolveDisplayGuard).toHaveBeenCalledWith(
+      'broken-promise',
+      true
+    );
+  });
+
+  it('answers once when a returned thenable settles more than once', async () => {
+    Responsly.setDisplayGuard((() => ({
+      then(resolve: (allow: boolean) => void, reject: (error: Error) => void) {
+        resolve(false);
+        resolve(true);
+        reject(new Error('already settled'));
+      },
+    })) as never);
+
+    askGuard('multiple-answers');
+    await flush();
+
+    expect(native.resolveDisplayGuard).toHaveBeenCalledTimes(1);
+    expect(native.resolveDisplayGuard).toHaveBeenCalledWith(
+      'multiple-answers',
+      false
+    );
+  });
+
   it('allows unless the answer is exactly false', async () => {
     Responsly.setDisplayGuard((() => undefined) as never);
     askGuard('req-7');
