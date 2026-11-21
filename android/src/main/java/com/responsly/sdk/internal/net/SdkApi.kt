@@ -94,6 +94,9 @@ internal class HttpSdkApi(
         connection.connectTimeout = TIMEOUT_MILLIS
         connection.readTimeout = TIMEOUT_MILLIS
         connection.useCaches = false
+        // The API endpoints are fixed. Never forward SDK headers to a Location supplied by a
+        // server; HttpURLConnection otherwise follows redirects to another origin by default.
+        connection.instanceFollowRedirects = false
         connection.setRequestProperty("X-Responsly-Sdk-Key", sdkKey)
         connection.setRequestProperty("X-Responsly-Platform", platform)
         connection.setRequestProperty("X-Responsly-Sdk-Version", sdkVersion)

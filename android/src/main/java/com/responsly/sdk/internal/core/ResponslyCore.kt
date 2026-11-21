@@ -1,7 +1,6 @@
 package com.responsly.sdk.internal.core
 
 import com.responsly.sdk.Answer
-import com.responsly.sdk.Decision
 import com.responsly.sdk.DisplayGuard
 import com.responsly.sdk.NotShownReason
 import com.responsly.sdk.QuestionAnsweredEvent
@@ -14,18 +13,15 @@ import com.responsly.sdk.SurveyErrorEvent
 import com.responsly.sdk.SurveyNotShownEvent
 import com.responsly.sdk.SurveyShownEvent
 import com.responsly.sdk.SurveyTrigger
-import com.responsly.sdk.internal.Cancellable
 import com.responsly.sdk.internal.Clock
 import com.responsly.sdk.internal.JsonValues
 import com.responsly.sdk.internal.Logger
 import com.responsly.sdk.internal.Scheduler
 import com.responsly.sdk.internal.arrayOrNull
 import com.responsly.sdk.internal.bridge.BridgeMessage
-import com.responsly.sdk.internal.bridge.SurveyContext
 import com.responsly.sdk.internal.bridge.SurveyUrl
 import com.responsly.sdk.internal.config.ConfigParser
 import com.responsly.sdk.internal.config.SdkConfig
-import com.responsly.sdk.internal.config.SurveyConfig
 import com.responsly.sdk.internal.net.ConfigResponse
 import com.responsly.sdk.internal.net.SdkApi
 import com.responsly.sdk.internal.objects
@@ -35,7 +31,6 @@ import com.responsly.sdk.internal.targeting.TargetingContext
 import com.responsly.sdk.internal.targeting.TargetingEngine
 import com.responsly.sdk.internal.targeting.TriggerCall
 import com.responsly.sdk.internal.telemetry.TelemetryQueue
-import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 
 /** Facts about the host app. [deviceLocale] is read whenever it is needed, so language changes are picked up. */
@@ -67,64 +62,6 @@ internal class ResponslyCore(
     private val listeners: ListenerHub,
     private val sdkVersion: String,
 ) {
-    private enum class Phase {
-        /** Selected; waiting for `delay_seconds`. */
-        WAITING,
-
-        /** The page is loading in the hidden container. */
-        LOADING,
-
-        /** The page is ready; the display guard is deciding. */
-        GUARD,
-
-        VISIBLE,
-    }
-
-    private class Session(
-        val survey: SurveyConfig,
-        val trigger: SurveyTrigger,
-        /** Selected by targeting rather than `showSurvey`. */
-        val auto: Boolean,
-        val force: Boolean,
-        val options: ShowOptions?,
-    ) {
-        var phase = Phase.WAITING
-        var request: PresentationRequest? = null
-
-        /** The presenter attempt whose callbacks are accepted. */
-        var token = 0L
-        var completed = false
-        var decision: GuardDecision? = null
-        var delayTimer: Cancellable? = null
-        var loadTimer: Cancellable? = null
-        var guardTimer: Cancellable? = null
-        var autoCloseTimer: Cancellable? = null
-
-        fun cancelTimers() {
-            delayTimer?.cancel()
-            loadTimer?.cancel()
-            guardTimer?.cancel()
-            autoCloseTimer?.cancel()
-            delayTimer = null
-            loadTimer = null
-            guardTimer = null
-            autoCloseTimer = null
-            decision = null
-        }
-    }
-
-    private class GuardDecision(private val onDecided: (GuardDecision, Boolean) -> Unit) : Decision {
-        private val decided = AtomicBoolean(false)
-
-        override fun allow() = decide(true)
-
-        override fun veto() = decide(false)
-
-        private fun decide(allowed: Boolean) {
-            if (decided.compareAndSet(false, true)) onDecided(this, allowed)
-        }
-    }
-
     /** A call made before the configuration was available. */
     private sealed class PendingCall {
         class Trigger(val call: TriggerCall) : PendingCall()
@@ -160,7 +97,7 @@ internal class ResponslyCore(
 
     private val remembered = ArrayDeque<() -> Unit>()
     private val pendingCalls = ArrayDeque<PendingCall>()
-    private var session: Session? = null
+    private var session: SurveySession? = null
     private var lastToken = 0L
 
     // region Public API (any thread)
@@ -207,7 +144,7 @@ internal class ResponslyCore(
     fun closeSurvey() {
         scheduler.execute {
             val active = session ?: return@execute
-            if (active.phase == Phase.VISIBLE) {
+            if (active.phase == SurveyPhase.VISIBLE) {
                 closeVisible(active, animated = true)
             } else {
                 cancelBeforeVisible(active, "closeSurvey()")
@@ -245,7 +182,7 @@ internal class ResponslyCore(
             refreshConfigIfNeeded("tracking enabled")
         } else {
             session?.let { active ->
-                if (active.phase == Phase.VISIBLE) {
+                if (active.phase == SurveyPhase.VISIBLE) {
                     closeVisible(active, animated = true)
                 } else {
                     // Never shown: cancelled without a state change, telemetry or a callback.
@@ -291,15 +228,15 @@ internal class ResponslyCore(
         override fun onHostLost(token: Long) = forSession(token) { handleHostLost(it) }
 
         override fun onUserClosed(token: Long) = forSession(token) {
-            if (it.phase == Phase.VISIBLE) closeVisible(it, animated = true)
+            if (it.phase == SurveyPhase.VISIBLE) closeVisible(it, animated = true)
         }
 
         override fun onHostDestroyed(token: Long) = forSession(token) {
-            if (it.phase == Phase.VISIBLE) closeVisible(it, animated = false)
+            if (it.phase == SurveyPhase.VISIBLE) closeVisible(it, animated = false)
         }
 
         override fun onNavigatedAway(token: Long) = forSession(token) {
-            if (it.phase == Phase.VISIBLE && it.completed) closeVisible(it, animated = true)
+            if (it.phase == SurveyPhase.VISIBLE && it.completed) closeVisible(it, animated = true)
         }
     }
 
@@ -381,7 +318,7 @@ internal class ResponslyCore(
         logger.info { "initialize: the API host changed; downloading the configuration again" }
         // A survey of the old configuration that is not on screen yet is not shown any more.
         session?.let { active ->
-            if (active.phase != Phase.VISIBLE) cancelBeforeVisible(active, "API host changed")
+            if (active.phase != SurveyPhase.VISIBLE) cancelBeforeVisible(active, "API host changed")
         }
         store.clearConfig()
         config = null
@@ -406,7 +343,7 @@ internal class ResponslyCore(
     /** Section 3: forget everything but the install id and the tracking switch. */
     private fun resetState(store: StateStore) {
         session?.let { active ->
-            if (active.phase == Phase.VISIBLE) {
+            if (active.phase == SurveyPhase.VISIBLE) {
                 closeVisible(active, animated = false)
             } else {
                 cancelBeforeVisible(active, "reset")
@@ -487,7 +424,7 @@ internal class ResponslyCore(
                 config = null
                 configReady = false
                 session?.let { active ->
-                    if (active.phase != Phase.VISIBLE) endNotShown(active, NotShownReason.CONFIG_UNAVAILABLE)
+                    if (active.phase != SurveyPhase.VISIBLE) endNotShown(active, NotShownReason.CONFIG_UNAVAILABLE)
                 }
                 failPendingShows()
                 pendingCalls.clear()
@@ -559,7 +496,7 @@ internal class ResponslyCore(
             TriggerCall.AppLaunch -> SurveyTrigger(SurveyTrigger.TYPE_APP_LAUNCH, null)
         }
         logger.debug { "targeting: survey ${survey.id} selected by ${describe(trigger)}" }
-        startSession(Session(survey, trigger, auto = true, force = false, options = null))
+        startSession(SurveySession(survey, trigger, auto = true, force = false, options = null))
     }
 
     private fun evaluateShow(surveyId: String, options: ShowOptions) {
@@ -571,7 +508,7 @@ internal class ResponslyCore(
         val survey = decision.selected ?: return
         logger.debug { "targeting: survey ${survey.id} selected by showSurvey" + if (options.force) " (force)" else "" }
         val trigger = SurveyTrigger(SurveyTrigger.TYPE_MANUAL, null)
-        startSession(Session(survey, trigger, auto = false, force = options.force, options = options))
+        startSession(SurveySession(survey, trigger, auto = false, force = options.force, options = options))
     }
 
     private fun targetingContext(): TargetingContext {
@@ -594,7 +531,7 @@ internal class ResponslyCore(
 
     // region The active survey
 
-    private fun startSession(active: Session) {
+    private fun startSession(active: SurveySession) {
         session = active
         val delay = if (active.auto) active.survey.delayMillis else 0L
         if (delay <= 0L) {
@@ -603,14 +540,14 @@ internal class ResponslyCore(
         }
         logger.debug { "survey ${active.survey.id}: waiting ${delay} ms before showing" }
         active.delayTimer = scheduler.schedule(delay) {
-            if (session === active && active.phase == Phase.WAITING) {
+            if (session === active && active.phase == SurveyPhase.WAITING) {
                 active.delayTimer = null
                 onDelayElapsed(active)
             }
         }
     }
 
-    private fun onDelayElapsed(active: Session) {
+    private fun onDelayElapsed(active: SurveySession) {
         val config = config
         val store = store
         if (config == null || store == null) {
@@ -628,7 +565,7 @@ internal class ResponslyCore(
         if (reason != null) endNotShown(active, reason) else beginLoading(active)
     }
 
-    private fun beginLoading(active: Session) {
+    private fun beginLoading(active: SurveySession) {
         val trigger = active.trigger
         if (trigger.type == SurveyTrigger.TYPE_SCREEN && trigger.name != currentScreen) {
             endNotShown(active, NotShownReason.SCREEN_CHANGED)
@@ -641,15 +578,15 @@ internal class ResponslyCore(
             return
         }
         active.request = request
-        active.phase = Phase.LOADING
+        active.phase = SurveyPhase.LOADING
         startLoadTimer(active)
         present(active)
     }
 
-    private fun startLoadTimer(active: Session) {
+    private fun startLoadTimer(active: SurveySession) {
         active.loadTimer?.cancel()
         active.loadTimer = scheduler.schedule(LOAD_TIMEOUT_MILLIS) {
-            if (session === active && active.phase == Phase.LOADING) {
+            if (session === active && active.phase == SurveyPhase.LOADING) {
                 active.loadTimer = null
                 logger.info { "survey ${active.survey.id}: not ready within ${LOAD_TIMEOUT_MILLIS / 1000} s" }
                 endNotShown(active, NotShownReason.LOAD_FAILED)
@@ -657,7 +594,7 @@ internal class ResponslyCore(
         }
     }
 
-    private fun present(active: Session) {
+    private fun present(active: SurveySession) {
         val presenter = platform?.presenter ?: return
         val request = active.request?.copy(token = ++lastToken) ?: return
         active.token = request.token
@@ -665,70 +602,44 @@ internal class ResponslyCore(
         scheduler.main { presenter.present(request, presenterEvents) }
     }
 
-    private fun buildRequest(active: Session): PresentationRequest? {
+    private fun buildRequest(active: SurveySession): PresentationRequest? {
         val environment = platform?.environment ?: return null
         val state = store?.state ?: return null
-        val survey = active.survey
-        val origin = SurveyUrl.origin(survey.url) ?: return null
-        // Only a locale that was set explicitly goes into the URL.
-        val explicitLocale = active.options?.locale?.trim()?.takeIf { it.isNotEmpty() } ?: state.locale
-        val style = active.options?.presentation ?: survey.presentation.style
-        val hidden = LinkedHashMap(state.hiddenFields)
-        active.options?.hiddenFields?.let(hidden::putAll)
-        val context = SurveyContext.build(
+        return PresentationRequestFactory.build(
+            survey = active.survey,
+            trigger = active.trigger,
+            options = active.options,
+            environment = environment,
+            state = state,
             platform = PLATFORM,
             sdkVersion = sdkVersion,
-            appId = environment.appId,
-            appVersion = environment.appVersion,
-            osVersion = environment.osVersion,
-            locale = explicitLocale ?: environment.deviceLocale(),
-            surveyId = survey.id,
-            trigger = active.trigger,
-            style = style,
-            dismissible = survey.presentation.dismissible,
-            anonymous = survey.anonymous,
-            userId = state.userId,
-            traits = LinkedHashMap(state.traits),
-            hidden = hidden,
-        )
-        return PresentationRequest(
-            token = 0L,
-            surveyId = survey.id,
-            url = SurveyUrl.build(survey.url, explicitLocale),
-            surveyUrl = survey.url,
-            origin = origin,
-            contextScript = SurveyContext.script(context),
-            style = style,
-            size = survey.presentation.size,
-            dismissible = survey.presentation.dismissible,
-            userAgentSuffix = " ResponslySDK/$sdkVersion ($PLATFORM)",
         )
     }
 
-    private fun forSession(token: Long, action: (Session) -> Unit) {
+    private fun forSession(token: Long, action: (SurveySession) -> Unit) {
         scheduler.execute {
             val active = session
             if (active != null && active.token == token) action(active)
         }
     }
 
-    private fun handleBridgeMessage(active: Session, message: BridgeMessage) {
+    private fun handleBridgeMessage(active: SurveySession, message: BridgeMessage) {
         val payload = message.payload
         logger.debug { "bridge: ${message.type} ${payload.toString().take(MAX_LOGGED_PAYLOAD)}" }
         val surveyId = active.survey.id
         when (message.type) {
-            BridgeMessage.READY -> if (active.phase == Phase.LOADING) onReady(active)
+            BridgeMessage.READY -> if (active.phase == SurveyPhase.LOADING) onReady(active)
             BridgeMessage.ERROR -> {
                 val code = text(payload, "code").ifEmpty { "unknown" }
                 val detail = text(payload, "message")
-                if (active.phase == Phase.VISIBLE) {
+                if (active.phase == SurveyPhase.VISIBLE) {
                     listeners.dispatch { it.onSurveyError(SurveyErrorEvent(surveyId, code, detail)) }
                 } else {
                     logger.info { "survey $surveyId: the page reported \"$code\" before it was ready" }
                     endNotShown(active, NotShownReason.SURVEY_UNAVAILABLE)
                 }
             }
-            BridgeMessage.QUESTION_ANSWERED -> if (active.phase == Phase.VISIBLE) {
+            BridgeMessage.QUESTION_ANSWERED -> if (active.phase == SurveyPhase.VISIBLE) {
                 val answer = answer(payload)
                 listeners.dispatch {
                     it.onQuestionAnswered(
@@ -736,10 +647,10 @@ internal class ResponslyCore(
                     )
                 }
             }
-            BridgeMessage.COMPLETED -> if (active.phase == Phase.VISIBLE && !active.completed) {
+            BridgeMessage.COMPLETED -> if (active.phase == SurveyPhase.VISIBLE && !active.completed) {
                 onCompleted(active, payload)
             }
-            BridgeMessage.CLOSE_REQUESTED -> if (active.phase == Phase.VISIBLE) {
+            BridgeMessage.CLOSE_REQUESTED -> if (active.phase == SurveyPhase.VISIBLE) {
                 closeVisible(active, animated = true)
             } else {
                 endNotShown(active, NotShownReason.LOAD_FAILED)
@@ -749,7 +660,7 @@ internal class ResponslyCore(
         }
     }
 
-    private fun onReady(active: Session) {
+    private fun onReady(active: SurveySession) {
         active.loadTimer?.cancel()
         active.loadTimer = null
         val guard = guard
@@ -757,7 +668,7 @@ internal class ResponslyCore(
             reveal(active)
             return
         }
-        active.phase = Phase.GUARD
+        active.phase = SurveyPhase.GUARD
         val decision = GuardDecision { decision, allowed ->
             scheduler.execute { onGuardDecision(active, decision, allowed) }
         }
@@ -779,8 +690,8 @@ internal class ResponslyCore(
         }
     }
 
-    private fun onGuardDecision(active: Session, decision: GuardDecision, allowed: Boolean) {
-        if (session !== active || active.phase != Phase.GUARD || active.decision !== decision) return
+    private fun onGuardDecision(active: SurveySession, decision: GuardDecision, allowed: Boolean) {
+        if (session !== active || active.phase != SurveyPhase.GUARD || active.decision !== decision) return
         active.guardTimer?.cancel()
         active.guardTimer = null
         active.decision = null
@@ -788,9 +699,9 @@ internal class ResponslyCore(
     }
 
     /** Section 4.4: the survey becomes visible. */
-    private fun reveal(active: Session) {
+    private fun reveal(active: SurveySession) {
         val surveyId = active.survey.id
-        active.phase = Phase.VISIBLE
+        active.phase = SurveyPhase.VISIBLE
         store?.markDisplayed(surveyId, clock.now(), active.auto)
         telemetry?.enqueue(TELEMETRY_DISPLAYED, surveyId)
         val token = active.token
@@ -801,7 +712,7 @@ internal class ResponslyCore(
         listeners.dispatch { it.onSurveyShown(event) }
     }
 
-    private fun onCompleted(active: Session, payload: JSONObject) {
+    private fun onCompleted(active: SurveySession, payload: JSONObject) {
         val surveyId = active.survey.id
         active.completed = true
         store?.markCompleted(surveyId, clock.now())
@@ -824,7 +735,7 @@ internal class ResponslyCore(
     }
 
     /** Closes the visible survey; counts as dismissed unless it was completed. */
-    private fun closeVisible(active: Session, animated: Boolean) {
+    private fun closeVisible(active: SurveySession, animated: Boolean) {
         val surveyId = active.survey.id
         active.cancelTimers()
         session = null
@@ -840,14 +751,14 @@ internal class ResponslyCore(
     }
 
     /** Ends a survey that never became visible. Nothing is recorded. */
-    private fun endNotShown(active: Session, reason: NotShownReason) {
+    private fun endNotShown(active: SurveySession, reason: NotShownReason) {
         cancelBeforeVisible(active, null)
         notShown(active.survey.id, reason)
     }
 
-    private fun cancelBeforeVisible(active: Session, why: String?) {
+    private fun cancelBeforeVisible(active: SurveySession, why: String?) {
         active.cancelTimers()
-        if (active.phase != Phase.WAITING) dismissContainer(active.token, animated = false)
+        if (active.phase != SurveyPhase.WAITING) dismissContainer(active.token, animated = false)
         if (session === active) session = null
         if (why != null) logger.debug { "survey ${active.survey.id}: cancelled before it was shown ($why)" }
     }
@@ -857,31 +768,31 @@ internal class ResponslyCore(
         scheduler.main { presenter.dismiss(token, animated) }
     }
 
-    private fun handleFailure(active: Session, code: String, detail: String) {
+    private fun handleFailure(active: SurveySession, code: String, detail: String) {
         val surveyId = active.survey.id
         when (active.phase) {
-            Phase.LOADING, Phase.GUARD -> {
+            SurveyPhase.LOADING, SurveyPhase.GUARD -> {
                 logger.info { "survey $surveyId: failed to load ($code: $detail)" }
                 endNotShown(active, NotShownReason.LOAD_FAILED)
             }
-            Phase.VISIBLE -> {
+            SurveyPhase.VISIBLE -> {
                 logger.info { "survey $surveyId: the page broke ($code: $detail); closing" }
                 listeners.dispatch { it.onSurveyError(SurveyErrorEvent(surveyId, code, detail)) }
                 closeVisible(active, animated = true)
             }
-            Phase.WAITING -> Unit
+            SurveyPhase.WAITING -> Unit
         }
     }
 
     /** The hidden container lost its activity (a splash screen finished, another screen opened): load again. */
-    private fun handleHostLost(active: Session) {
-        if (active.phase != Phase.LOADING && active.phase != Phase.GUARD) return
+    private fun handleHostLost(active: SurveySession) {
+        if (active.phase != SurveyPhase.LOADING && active.phase != SurveyPhase.GUARD) return
         logger.debug { "survey ${active.survey.id}: the host activity changed before the survey was shown; loading again" }
-        if (active.phase == Phase.GUARD) {
+        if (active.phase == SurveyPhase.GUARD) {
             active.guardTimer?.cancel()
             active.guardTimer = null
             active.decision = null
-            active.phase = Phase.LOADING
+            active.phase = SurveyPhase.LOADING
             startLoadTimer(active)
         }
         present(active)
